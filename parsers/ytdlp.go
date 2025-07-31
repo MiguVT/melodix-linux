@@ -22,21 +22,18 @@ func NewYtdlpWrapper() *YtdlpWrapper {
 
 
 // getCookieFileOption checks for the cookie file path in the environment and returns the yt-dlp args if found.
-func getCookieFileOption() []string {
-	cookiePath := env.GetEnv("ENCODE_COOKIE_FILE_PATH", "cookies.txt")
-	if _, err := os.Stat(cookiePath); err == nil {
-		return []string{"--cookies", cookiePath}
-	}
-	return nil
+func getCookieArgs(url string) []string {
+	   cookiePath := env.GetEnv("ENCODE_COOKIE_FILE_PATH", "cookies.txt")
+	   if _, err := os.Stat(cookiePath); err == nil {
+			   return []string{"--cookies", cookiePath, url}
+	   }
+	   return []string{url}
 }
 
 func (y *YtdlpWrapper) GetStreamURL(url string) (string, error) {
-	dl := ytdlp.New().GetURL()
-	if opts := getCookieFileOption(); opts != nil {
-		dl = dl.Args(opts...)
-	}
-
-	result, err := dl.Run(context.TODO(), url)
+	   dl := ytdlp.New().GetURL()
+	   args := getCookieArgs(url)
+	   result, err := dl.Run(context.TODO(), args...)
 	if err != nil {
 		return "", fmt.Errorf("failed to execute yt-dlp: %w", err)
 	}
@@ -58,12 +55,10 @@ func (y *YtdlpWrapper) GetStreamURL(url string) (string, error) {
 }
 
 func (y *YtdlpWrapper) GetMetaInfo(url string) (Meta, error) {
-	timestamp := time.Now().Format("20060102_150405")
-	dl := ytdlp.New().DumpJSON().SkipDownload().Output(timestamp + ".%(ext)s")
-	if opts := getCookieFileOption(); opts != nil {
-		dl = dl.Args(opts...)
-	}
-	result, err := dl.Run(context.TODO(), url)
+	   timestamp := time.Now().Format("20060102_150405")
+	   dl := ytdlp.New().DumpJSON().SkipDownload().Output(timestamp + ".%(ext)s")
+	   args := getCookieArgs(url)
+	   result, err := dl.Run(context.TODO(), args...)
 	if err != nil {
 		return Meta{}, fmt.Errorf("failed to execute yt-dlp: %w", err)
 	}
@@ -97,14 +92,13 @@ func (y *YtdlpWrapper) DownloadStream(url string) (*ytdlp.Result, string, error)
 			   NoKeepVideo().
 			   Format("bestaudio").
 			   Output(outputFile)
-	   if opts := getCookieFileOption(); opts != nil {
-			   dl = dl.Args(opts...)
-	   }
+
+	   args := getCookieArgs(url)
 
 	   ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
 	   defer cancel()
 
-	   result, err := dl.Run(ctx, url)
+	   result, err := dl.Run(ctx, args...)
 	   if err != nil {
 			   _ = os.Remove(outputFile)
 			   return nil, "", fmt.Errorf("failed to download stream from URL %q: %w", url, err)
