@@ -11,7 +11,7 @@ import (
 	"time"
 
 	"github.com/lrstanley/go-ytdlp"
-	"env"
+	"github.com/keshon/melodix/env"
 )
 
 type YtdlpWrapper struct{}
