@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/lrstanley/go-ytdlp"
+	"env"
 )
 
 type YtdlpWrapper struct{}
@@ -19,8 +20,21 @@ func NewYtdlpWrapper() *YtdlpWrapper {
 	return &YtdlpWrapper{}
 }
 
+
+// getCookieFileOption checks for the cookie file path in the environment and returns the yt-dlp args if found.
+func getCookieFileOption() []string {
+	cookiePath := env.GetEnv("ENCODE_COOKIE_FILE_PATH", "cookies.txt")
+	if _, err := os.Stat(cookiePath); err == nil {
+		return []string{"--cookies", cookiePath}
+	}
+	return nil
+}
+
 func (y *YtdlpWrapper) GetStreamURL(url string) (string, error) {
 	dl := ytdlp.New().GetURL()
+	if opts := getCookieFileOption(); opts != nil {
+		dl = dl.Args(opts...)
+	}
 
 	result, err := dl.Run(context.TODO(), url)
 	if err != nil {
@@ -46,6 +60,9 @@ func (y *YtdlpWrapper) GetStreamURL(url string) (string, error) {
 func (y *YtdlpWrapper) GetMetaInfo(url string) (Meta, error) {
 	timestamp := time.Now().Format("20060102_150405")
 	dl := ytdlp.New().DumpJSON().SkipDownload().Output(timestamp + ".%(ext)s")
+	if opts := getCookieFileOption(); opts != nil {
+		dl = dl.Args(opts...)
+	}
 	result, err := dl.Run(context.TODO(), url)
 	if err != nil {
 		return Meta{}, fmt.Errorf("failed to execute yt-dlp: %w", err)
@@ -63,37 +80,40 @@ func (y *YtdlpWrapper) GetMetaInfo(url string) (Meta, error) {
 }
 
 func (y *YtdlpWrapper) DownloadStream(url string) (*ytdlp.Result, string, error) {
-	cacheDir := "./cache"
+	   cacheDir := "./cache"
 
-	if err := os.MkdirAll(cacheDir, 0755); err != nil {
-		return nil, "", fmt.Errorf("failed to create cache directory: %w", err)
-	}
+	   if err := os.MkdirAll(cacheDir, 0755); err != nil {
+			   return nil, "", fmt.Errorf("failed to create cache directory: %w", err)
+	   }
 
-	timestamp := time.Now().Format("20060102_150405")
-	outputFile := filepath.Join(cacheDir, timestamp)
+	   timestamp := time.Now().Format("20060102_150405")
+	   outputFile := filepath.Join(cacheDir, timestamp)
 
-	dl := ytdlp.New().
-		// FormatSort("acodec:opus").
-		NoPart().
-		NoPlaylist().
-		NoOverwrites().
-		NoKeepVideo().
-		Format("bestaudio").
-		Output(outputFile)
+	   dl := ytdlp.New().
+			   // FormatSort("acodec:opus").
+			   NoPart().
+			   NoPlaylist().
+			   NoOverwrites().
+			   NoKeepVideo().
+			   Format("bestaudio").
+			   Output(outputFile)
+	   if opts := getCookieFileOption(); opts != nil {
+			   dl = dl.Args(opts...)
+	   }
 
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
-	defer cancel()
+	   ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
+	   defer cancel()
 
-	result, err := dl.Run(ctx, url)
-	if err != nil {
-		_ = os.Remove(outputFile)
-		return nil, "", fmt.Errorf("failed to download stream from URL %q: %w", url, err)
-	}
+	   result, err := dl.Run(ctx, url)
+	   if err != nil {
+			   _ = os.Remove(outputFile)
+			   return nil, "", fmt.Errorf("failed to download stream from URL %q: %w", url, err)
+	   }
 
-	absPath, err := filepath.Abs(outputFile)
-	if err != nil {
-		return nil, "", fmt.Errorf("failed to resolve absolute path for %q: %w", outputFile, err)
-	}
+	   absPath, err := filepath.Abs(outputFile)
+	   if err != nil {
+			   return nil, "", fmt.Errorf("failed to resolve absolute path for %q: %w", outputFile, err)
+	   }
 
-	return result, absPath, nil
+	   return result, absPath, nil
 }
